@@ -2,16 +2,14 @@
 // Divides the screen into three regions, each with its own slideshow
 
 // Configuration
-const SCREEN_WIDTH = 2560;
-const SCREEN_HEIGHT = 1440;
+const TARGET_ASPECT_RATIO = 16 / 9;
 const REGIONS = 3;
-const REGION_WIDTH = Math.floor(SCREEN_WIDTH / REGIONS);  // 854 (rounded from 853.33)
-const REGION_HEIGHT = SCREEN_HEIGHT;  // 1440
+// REGION_WIDTH and REGION_HEIGHT will be calculated dynamically
 const DEFAULT_SLIDESHOW_INTERVAL = 10000;  // Change image every 10 seconds
 const DEFAULT_FADE_DURATION = 1000;  // 1 second fade transition
 
 // State for each region
-let regions = [];
+let regions = []; // Will store { element, imgContainers, activeContainer, width, height }
 let imageCache = [[], [], []];
 let currentImageIndex = [0, 0, 0];
 let loadingPromises = [[], [], []];
@@ -25,59 +23,125 @@ let randomizeImages = false;
 // Initialize when the document is ready
 window.onload = function() {
     console.log('Window loaded, initializing UI');
-    initializeUI();
+    initializeUI(); // Create elements first
+    updateLayout(); // Calculate and apply initial layout
     loadImagesForAllRegions();
     startSlideshows();
+    window.addEventListener('resize', updateLayout); // Update layout on resize
 };
 
-// Create the UI elements
+// Create the UI elements (without setting dimensions initially)
 function initializeUI() {
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.overflow = 'hidden';
+    document.body.style.backgroundColor = 'black'; // Black background for letter/pillar-boxing
+
     const container = document.createElement('div');
     container.id = 'slideshow-container';
-    container.style.width = '100%';
-    container.style.height = '100%';
+    // Dimensions and position will be set in updateLayout
     container.style.position = 'absolute';
-    container.style.top = '0';
-    container.style.left = '0';
-    container.style.margin = '0';
-    container.style.padding = '0';
     container.style.overflow = 'hidden';
-    
+    container.style.backgroundColor = '#111'; // Dark grey for the main container background
+
     // Create three regions
     for (let i = 0; i < REGIONS; i++) {
         const region = document.createElement('div');
         region.className = 'slideshow-region';
         region.id = `region-${i+1}`;
-        region.style.width = `${REGION_WIDTH}px`;
-        region.style.height = `${REGION_HEIGHT}px`;
+        // Dimensions and position will be set in updateLayout
         region.style.position = 'absolute';
-        region.style.top = '0';
-        region.style.left = `${i * REGION_WIDTH}px`;
+        region.style.top = '0'; // Top is relative to the container
         region.style.overflow = 'hidden';
         region.style.backgroundColor = '#333'; // Add background color to make regions visible
-        
+
         // Create two image containers for crossfade effect
         const imgContainer1 = createImageContainer(`img-${i+1}-1`, true);
         const imgContainer2 = createImageContainer(`img-${i+1}-2`, false);
-        
+
         region.appendChild(imgContainer1);
         region.appendChild(imgContainer2);
-        
+
         container.appendChild(region);
-        
-        // Store references to the image containers
+
+        // Store references to the image containers (width/height added later)
         regions.push({
             element: region,
             imgContainers: [imgContainer1, imgContainer2],
             activeContainer: 0
         });
     }
-    
+
     document.body.appendChild(container);
-    
+
     // Debug message to indicate the UI has been initialized
-    console.log('UI initialized with ' + REGIONS + ' regions');
-    showDebugInfo('UI初始化完成');
+    console.log('UI elements created for ' + REGIONS + ' regions');
+    showDebugInfo('UI元素创建完成');
+}
+
+// New function to calculate and apply layout based on window size
+function updateLayout() {
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    const screenRatio = screenWidth / screenHeight;
+
+    let containerWidth, containerHeight, containerTop, containerLeft;
+
+    // Determine container size and position to maintain 16:9 aspect ratio
+    if (screenRatio > TARGET_ASPECT_RATIO) {
+        // Screen is wider than 16:9 (pillarbox)
+        containerHeight = screenHeight;
+        containerWidth = Math.floor(containerHeight * TARGET_ASPECT_RATIO);
+        containerTop = 0;
+        containerLeft = Math.floor((screenWidth - containerWidth) / 2);
+    } else {
+        // Screen is narrower than or equal to 16:9 (letterbox)
+        containerWidth = screenWidth;
+        containerHeight = Math.floor(containerWidth / TARGET_ASPECT_RATIO);
+        containerTop = Math.floor((screenHeight - containerHeight) / 2);
+        containerLeft = 0;
+    }
+
+    const container = document.getElementById('slideshow-container');
+    if (!container) {
+        console.error("Slideshow container not found!");
+        return;
+    }
+    container.style.width = `${containerWidth}px`;
+    container.style.height = `${containerHeight}px`;
+    container.style.top = `${containerTop}px`;
+    container.style.left = `${containerLeft}px`;
+
+    // Calculate dimensions for each region
+    const regionWidth = Math.floor(containerWidth / REGIONS);
+    const regionHeight = containerHeight; // Regions span the full height of the container
+
+    // Apply dimensions to each region and store them
+    for (let i = 0; i < REGIONS; i++) {
+        const region = regions[i];
+        if (!region || !region.element) continue;
+
+        region.element.style.width = `${regionWidth}px`;
+        region.element.style.height = `${regionHeight}px`;
+        region.element.style.left = `${i * regionWidth}px`; // Position relative to container
+
+        // Store calculated dimensions for image scaling
+        region.width = regionWidth;
+        region.height = regionHeight;
+
+        // Trigger a redraw of the current image in the region if it exists
+        // This ensures images scale correctly after resize
+        if (imageCache[i].length > 0) {
+             // Temporarily store current index to avoid race conditions with slideshow timer
+             const currentIndex = currentImageIndex[i];
+             // Check if image data is available before calling displayImage
+             if (imageCache[i][currentIndex]) {
+                displayImage(i, currentIndex);
+             }
+        }
+    }
+
+    console.log(`Layout updated: Container ${containerWidth}x${containerHeight} @ ${containerLeft},${containerTop}. Region ${regionWidth}x${regionHeight}`);
 }
 
 // Create an image container for the slideshow
@@ -323,11 +387,15 @@ function shuffleArray(array) {
 
 // Display an image in a region
 function displayImage(regionIndex, imageIndex) {
-    if (imageCache[regionIndex].length === 0) return;
+    // Ensure region data including dimensions is available
+    const region = regions[regionIndex];
+    if (imageCache[regionIndex].length === 0 || !region || !region.height) {
+        console.warn(`Cannot display image for region ${regionIndex + 1}: No images or layout not ready.`);
+        return;
+    }
     
     // Get the correct index (wrap around if needed)
     const actualIndex = imageIndex % imageCache[regionIndex].length;
-    const region = regions[regionIndex];
     const imgData = imageCache[regionIndex][actualIndex];
     
     console.log(`显示区域 ${regionIndex + 1} 的图片 ${actualIndex + 1}/${imageCache[regionIndex].length}`);
@@ -342,13 +410,16 @@ function displayImage(regionIndex, imageIndex) {
     // Create a clone of the image element
     const img = imgData.element.cloneNode(true);
     
+    // Get dynamic region height for scaling
+    const regionHeight = region.height;
+
     // Calculate the proper scaling to maintain aspect ratio
-    // and fill height at 1440px
-    const scale = REGION_HEIGHT / img.height;
+    // and fill region height
+    const scale = regionHeight / img.height; // Use dynamic region height
     const scaledWidth = img.width * scale;
     
     // Apply the scaling
-    img.style.height = `${REGION_HEIGHT}px`;
+    img.style.height = `${regionHeight}px`; // Use dynamic region height
     img.style.width = `${scaledWidth}px`;
     img.style.objectFit = 'cover';
     img.style.objectPosition = 'center';
@@ -418,9 +489,15 @@ function restartSlideshows() {
         }
     }
 
-    // Update transition duration for all containers
-    document.querySelectorAll('.image-container').forEach(container => {
-        container.style.transition = `opacity ${fadeDuration}ms ease-in-out`;
+    // Update transition duration for all containers (already done in initializeUI/updateLayout implicitly if needed)
+    // We might need to re-apply transition here if updateLayout changes it, but it doesn't.
+    // Ensure fadeDuration is applied correctly to image containers
+    regions.forEach(region => {
+        region.imgContainers.forEach(container => {
+             if(container) { // Check if container exists
+                 container.style.transition = `opacity ${fadeDuration}ms ease-in-out`;
+             }
+        });
     });
 
     // Restart slideshows (which will now use random intervals)

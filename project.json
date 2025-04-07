@@ -1,5 +1,6 @@
 {
 	"contentrating" : "Everyone",
+	"description" : "",
 	"file" : "index.html",
 	"general" : 
 	{
@@ -47,8 +48,9 @@
 	"ratingviolence" : "none",
 	"tags" : [ "Anime" ],
 	"title" : "WA2 - Triple Region Slideshow",
-	"type" : "web",
+	"type" : "Web",
 	"version" : 1,
+	"visibility" : "public",
 	"workshopid" : "3459602594",
 	"workshopurl" : "steam://url/CommunityFilePage/3459602594"
 }

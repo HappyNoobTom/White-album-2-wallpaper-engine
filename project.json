@@ -1,0 +1,54 @@
+{
+	"contentrating" : "Everyone",
+	"file" : "index.html",
+	"general" : 
+	{
+		"properties" : 
+		{
+			"fadeDuration" : 
+			{
+				"index" : 1,
+				"max" : 5,
+				"min" : 0.5,
+				"order" : 101,
+				"text" : "Fade transition duration (seconds)",
+				"type" : "slider",
+				"value" : 1
+			},
+			"randomize" : 
+			{
+				"index" : 2,
+				"order" : 102,
+				"text" : "Randomize images",
+				"type" : "bool",
+				"value" : false
+			},
+			"schemecolor" : 
+			{
+				"order" : 0,
+				"text" : "ui_browse_properties_scheme_color",
+				"type" : "color",
+				"value" : "0 0 0"
+			},
+			"slideshowInterval" : 
+			{
+				"index" : 0,
+				"max" : 60,
+				"min" : 3,
+				"order" : 100,
+				"text" : "Slideshow interval (seconds)",
+				"type" : "slider",
+				"value" : 10
+			}
+		}
+	},
+	"preview" : "preview.jpg",
+	"ratingsex" : "none",
+	"ratingviolence" : "none",
+	"tags" : [ "Anime" ],
+	"title" : "WA2 - Triple Region Slideshow",
+	"type" : "web",
+	"version" : 1,
+	"workshopid" : "3459602594",
+	"workshopurl" : "steam://url/CommunityFilePage/3459602594"
+}
